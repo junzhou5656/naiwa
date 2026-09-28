@@ -151,6 +151,8 @@
 
     <div class="card">
       <h2>💬 留言板</h2>
+      <!-- 加上了提示语 -->
+      <div style="font-size:13px; color:#E65100; margin-bottom:8px;">💡 可以留下你的打卡照片哦～</div>
       <form id="messageForm">
         <textarea id="messageContent" maxlength="500" placeholder="说点什么吧～"></textarea>
         <label for="msgPhoto" class="photo-upload-label">📷 点击上传图片（可选）</label>
@@ -223,8 +225,7 @@
       isMusicPlaying = !isMusicPlaying;
     });
 
-    // ================= 【已补全】页面可见性监听 =================
-    // 切后台、锁屏、切标签页时暂停
+    // ================= 页面可见性监听 =================
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         if (isMusicPlaying) bgm.pause();
@@ -235,14 +236,13 @@
       }
     });
 
-    // 彻底关闭页面或离开时停止播放
     window.addEventListener('pagehide', () => {
       if (isMusicPlaying) bgm.pause();
     });
     window.addEventListener('beforeunload', () => {
       if (isMusicPlaying) bgm.pause();
     });
-    // ==========================================================
+    // ==================================================
 
     // 陀螺仪 3D 视差
     let gyroEnabled = true;
@@ -324,25 +324,21 @@
     }
 
     async function loadMessages() {
-      const { data, error } = await db.from('messages').select('*').order('created_at', { ascending: false }).limit(30);
+      // 修改为最多加载 50 条
+      const { data, error } = await db.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
       if (error) { console.error(error); return; }
       const box = $('messageList');
       if (!data || data.length === 0) { box.innerHTML = `<img src="images/4.jpg" class="empty-img"><p style="text-align:center;color:#999;font-size:13px;">还没有留言，快来抢沙发～</p>`; return; }
       
-      const validMessages = data.filter(item => item.photo_url);
-      
-      if (validMessages.length === 0) {
-        box.innerHTML = `<img src="images/4.jpg" class="empty-img"><p style="text-align:center;color:#999;font-size:13px;">还没有带图片的留言～</p>`;
-        return;
-      }
-
-      box.innerHTML = validMessages.map(item => `
-        <div class="message-item">
+      // 修复：不再过滤纯文字，所有留言都显示
+      box.innerHTML = data.map(item => `
+        <div class="message-item" id="msg-${item.id}">
           <img class="message-avatar" src="${item.avatar || 'images/t1.jpg'}" onerror="this.src='images/t1.jpg'">
           <div class="message-body">
             <div class="message-head"><strong>${escapeHtml(item.nickname || '匿名同学')}</strong><time>${formatTime(item.created_at)}</time></div>
             <p class="message-content">${escapeHtml(item.content)}</p>
-            <img class="message-img" src="${item.photo_url}" onerror="this.parentElement.parentElement.style.display='none'">
+            <!-- 只有有图片时才渲染图片，如果图片加载失败，隐藏整条留言 -->
+            ${item.photo_url ? `<img class="message-img" src="${item.photo_url}" onerror="document.getElementById('msg-${item.id}').style.display='none'">` : ''}
           </div>
         </div>
       `).join('');
@@ -357,6 +353,7 @@
         cur.textContent = '当前位置：图书馆前'; photoDiv.innerHTML = ''; box.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">还没有旅行记录～</p>'; return; 
       }
       
+      // 位置记录依然保留“图片被删就隐藏整条”的逻辑（因为你特别要求过）
       const validLocations = data.filter(item => item.photo_url);
       
       if (validLocations.length === 0) {
