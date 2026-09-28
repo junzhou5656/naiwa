@@ -223,6 +223,27 @@
       isMusicPlaying = !isMusicPlaying;
     });
 
+    // ================= 【已补全】页面可见性监听 =================
+    // 切后台、锁屏、切标签页时暂停
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (isMusicPlaying) bgm.pause();
+      } else {
+        if (isMusicPlaying && bgm.paused) {
+          bgm.play().catch(e => {});
+        }
+      }
+    });
+
+    // 彻底关闭页面或离开时停止播放
+    window.addEventListener('pagehide', () => {
+      if (isMusicPlaying) bgm.pause();
+    });
+    window.addEventListener('beforeunload', () => {
+      if (isMusicPlaying) bgm.pause();
+    });
+    // ==========================================================
+
     // 陀螺仪 3D 视差
     let gyroEnabled = true;
     let tiltX = 0, tiltY = 0;
