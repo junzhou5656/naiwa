@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>广东医科大学爱奶娃协会 · 漂流打卡牌</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #FFF8E7; color: #333; overflow-x: hidden; }
+    
+    #musicToggle { position: fixed; top: 15px; right: 15px; z-index: 10000; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(5px); border: 1px solid #FFD54F; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: all 0.2s; }
+    #musicToggle:active { transform: scale(0.9); }
+    #toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.75); color: #fff; padding: 15px 30px; border-radius: 20px; font-size: 18px; font-weight: bold; z-index: 9999; display: none; text-align: center; pointer-events: none; animation: popIn 0.3s ease-out; }
+    @keyframes popIn { from { transform: translate(-50%, -50%) scale(0.5); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+
+    /* 封面页 */
+    #cover-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0a0a0a; z-index: 9998; display: flex; justify-content: center; align-items: center; perspective: 1200px; overflow: hidden; transition: opacity 0.8s ease; }
+    .bg-layer { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: radial-gradient(circle at 50% 50%, rgba(255, 200, 100, 0.15) 0%, transparent 60%), repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255, 255, 255, 0.02) 40px, rgba(255, 255, 255, 0.02) 41px), repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255, 255, 255, 0.02) 40px, rgba(255, 255, 255, 0.02) 41px); z-index: 1; transition: transform 0.08s ease-out; }
+    .cover-half { position: absolute; width: 140vw; height: 140vh; top: -20vh; left: -20vw; background-image: url('images/5.jpg'); background-size: cover; background-position: center; transition: transform 1.5s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s ease; z-index: 2; will-change: transform; }
+    .cover-left { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); transform-origin: left center; }
+    .cover-right { clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%); transform-origin: right center; }
+    .fly-away .cover-left { transform: translateX(-100%) rotateY(45deg) scale(0.8); opacity: 0; }
+    .fly-away .cover-right { transform: translateX(100%) rotateY(-45deg) scale(0.8); opacity: 0; }
+    .cover-content { position: relative; z-index: 10; text-align: center; color: #fff; padding: 20px; }
+    .cover-content h1 { font-size: 32px; font-weight: 600; letter-spacing: 4px; text-shadow: 0 4px 20px rgba(0,0,0,0.8); margin-bottom: 50px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .start-btn { padding: 16px 45px; font-size: 18px; font-weight: 600; color: #fff; background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50px; cursor: pointer; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); transition: all 0.3s; letter-spacing: 2px; }
+    .start-btn:active { transform: scale(0.98); }
+
+    /* 选角色弹窗 */
+    #roleModal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10001; display: none; justify-content: center; align-items: center; padding: 20px; }
+    .role-box { background: #fff; border-radius: 20px; padding: 20px; width: 100%; max-width: 400px; text-align: center; }
+    .role-box h2 { color: #E65100; font-size: 20px; margin-bottom: 15px; }
+    .role-avatars { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+    .role-avatars img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid transparent; cursor: pointer; }
+    .role-avatars img.selected { border-color: #FF9800; }
+    .role-box input { width: 100%; padding: 12px; border: 2px solid #FFE082; border-radius: 12px; margin-bottom: 15px; font-size: 15px; outline: none; }
+    .role-box button { width: 100%; padding: 12px; background: linear-gradient(135deg, #FF9800, #FF5722); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; }
+
+    /* 主内容 */
+    #main-content { display: none; max-width: 600px; margin: 0 auto; padding: 15px; }
+    .hero { text-align: center; background: linear-gradient(135deg, #FFD54F, #FFB300); border-radius: 0 0 30px 30px; padding: 20px 10px; margin-bottom: 20px; }
+    .hero img { width: 120px; margin-bottom: 10px; }
+    .hero h1 { font-size: 22px; margin: 0; color: #4E342E; }
+    .hero p { font-size: 14px; color: #6D4C41; margin: 5px 0 0; }
+    .card { background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 16px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid rgba(255, 255, 255, 0.5); color: #333; }
+    .card h2 { font-size: 18px; margin-top: 0; color: #E65100; display: flex; align-items: center; gap: 8px; }
+    .safety-card { background: #FFF3E0; border: 2px dashed #FF9800; }
+    .btn { width: 100%; border: none; border-radius: 50px; padding: 14px; font-size: 16px; font-weight: bold; color: #fff; background: linear-gradient(135deg, #FF9800, #FF5722); box-shadow: 0 4px 0 #E65100; transition: all 0.1s; cursor: pointer; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn:active { transform: translateY(4px); box-shadow: none; }
+    .btn-blue { background: linear-gradient(135deg, #42A5F5, #1E88E5); box-shadow: 0 4px 0 #1565C0; }
+    textarea { width: 100%; border: 2px solid #FFE082; border-radius: 12px; padding: 10px; font-size: 15px; margin-bottom: 10px; outline: none; }
+    input[type="text"] { width: 100%; border: 2px solid #FFE082; border-radius: 12px; padding: 10px; font-size: 15px; margin-bottom: 10px; outline: none; }
+    .photo-upload-label { display: block; background: #FFF3E0; border: 2px dashed #FF9800; color: #E65100; text-align: center; padding: 15px; border-radius: 12px; cursor: pointer; margin-bottom: 10px; font-size: 14px; font-weight: bold; }
+    #msgPhoto, #locPhoto { display: none; }
+    .photo-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 10px; margin-top: 10px; display: none; }
+    
+    /* 留言列表 */
+    .message-item { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; gap: 10px; }
+    .message-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .message-body { flex: 1; min-width: 0; }
+    .message-head { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .message-head strong { font-size: 15px; color: #333; }
+    .message-head time { color: #999; font-size: 12px; }
+    .message-content { font-size: 14px; color: #555; line-height: 1.5; margin-bottom: 5px; word-break: break-all; }
+    .message-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-top: 5px; display: block; }
+
+    .list-item { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; }
+    .list-item:last-child { border-bottom: none; }
+    .empty-img { width: 80px; display: block; margin: 10px auto; }
+    .warning-text { color: #D32F2F; font-size: 13px; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+    footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+  <audio id="bgm" loop src="bgm.mp3"></audio>
+  <div id="musicToggle">🔊</div>
+  <div id="toast"></div>
+
+  <!-- 选角色弹窗（头像路径已改为 t1.JPG ~ t4.JPG） -->
+  <div id="roleModal">
+    <div class="role-box">
+      <h2>👋 选一个你的角色吧</h2>
+      <div class="role-avatars" id="avatarList">
+        <img src="images/t1.JPG" data-value="images/t1.JPG" alt="奶娃1">
+        <img src="images/t2.JPG" data-value="images/t2.JPG" alt="奶娃2">
+        <img src="images/t3.JPG" data-value="images/t3.JPG" alt="奶娃3">
+        <img src="images/t4.JPG" data-value="images/t4.JPG" alt="奶娃4">
+      </div>
+      <input id="roleName" type="text" maxlength="10" placeholder="给自己起个名字（留空则匿名）">
+      <button id="roleConfirm">开始奶娃之旅</button>
+    </div>
+  </div>
+
+  <!-- 封面页 -->
+  <div id="cover-page">
+    <div class="bg-layer" id="bgLayer"></div>
+    <div class="cover-half cover-left" id="coverLeft"></div>
+    <div class="cover-half cover-right" id="coverRight"></div>
+    <div class="cover-content" id="coverContent">
+      <h1>爱奶娃漂流之旅</h1>
+      <button class="start-btn" id="startBtn">开启你的奶娃之旅</button>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div id="main-content">
+    <div class="hero">
+      <img src="images/2.jpg" alt="爱奶娃">
+      <h1>广东医科大学爱奶娃协会</h1>
+      <p>带我走 · 漂流打卡牌</p>
+    </div>
+
+    <div class="card safety-card">
+      <h2>🛡️ 安全声明</h2>
+      <p style="font-size:14px;">本二维码为学生临时漂流打卡活动，仅用于校园打卡留言。</p>
+      <p style="font-size:13px; color:#E65100;">✅ 不收费 ✅ 不索要验证码 ✅ 不收集隐私</p>
+      <img src="images/3.jpg" class="empty-img" alt="生无可恋">
+      <p style="font-size:12px; text-align:center; color:#666;">如遇付费或索要验证码，请立即退出并联系：周奶娃（电话见立牌）</p>
+    </div>
+
+    <!-- 位置区 -->
+    <div class="card">
+      <h2>📍 001号漂流牌当前位置</h2>
+      <div id="currentLocation" style="font-size:15px; font-weight:bold; color:#E65100;">正在寻找立牌...</div>
+      <div id="currentPhoto" style="margin-top:10px;"></div>
+      
+      <button class="btn btn-blue" id="toggleTrajectory" style="margin-top:15px;">📜 奶娃的旅行轨迹</button>
+      <div id="trajectoryPanel" style="display:none; margin-top:10px;">
+        <div id="locationList"></div>
+      </div>
+
+      <hr style="margin: 15px 0; border: none; border-top: 1px dashed #FFE082;">
+      <div class="warning-text">⚠️ 提示：请务必填写真实准确的位置，并且上传一张当前位置的照片！</div>
+      <input id="locPlace" type="text" maxlength="50" placeholder="当前位置，例如：图书馆前">
+      <label for="locPhoto" class="photo-upload-label">📷 点击拍照/上传立牌现在的位置照片</label>
+      <input type="file" id="locPhoto" accept="image/*" capture="environment">
+      <img id="locPhotoPreview" class="photo-preview" src="" alt="预览">
+      <button class="btn" id="locBtn">我把它带到了新地方</button>
+    </div>
+
+    <div class="card">
+      <h2>🎯 今日打卡</h2>
+      <div style="text-align:center; font-size:14px; margin-bottom:10px;">
+        已有 <span id="checkinCount" style="font-size:20px; font-weight:bold; color:#FF5722;">0</span> 人打卡
+      </div>
+      <button class="btn" id="checkinBtn">拔剑！我要打卡！</button>
+    </div>
+
+    <div class="card">
+      <h2>💬 留言板</h2>
+      <form id="messageForm">
+        <textarea id="messageContent" maxlength="500" placeholder="说点什么吧～"></textarea>
+        <label for="msgPhoto" class="photo-upload-label">📷 点击上传图片（可选）</label>
+        <input type="file" id="msgPhoto" accept="image/*">
+        <img id="msgPhotoPreview" class="photo-preview" src="" alt="预览">
+        <button type="submit" class="btn">发布留言</button>
+      </form>
+      <div id="messageList" style="margin-top:10px;"></div>
+    </div>
+
+    <footer>
+      主办：广东医科大学爱奶娃协会<br>
+      联系人：周奶娃（电话见立牌）<br>
+      仅收集昵称、留言、打卡时间和位置；活动结束后30天内删除。
+    </footer>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://hnisjkvtqvxytzlxhosm.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_IPvO5wZJLu6tYMdcymItSw_t0O80_ga';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const $ = id => document.getElementById(id);
+
+    let toastTimer;
+    function showToast(text, duration = 3000) {
+      const toast = $('toast'); toast.textContent = text; toast.style.display = 'block';
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.style.display = 'none'; }, duration);
+    }
+
+    // 播放自定义音效
+    function playCustomSound(fileName) {
+      const audio = new Audio(fileName);
+      audio.volume = 0.6;
+      audio.play().catch(e => console.log('音效播放被拦截:', e));
+    }
+
+    let currentUser = JSON.parse(localStorage.getItem('gdmc_user') || 'null');
+    let selectedAvatar = '';
+
+    function initUser() {
+      if (currentUser) { $('roleModal').style.display = 'none'; return true; }
+      else { $('roleModal').style.display = 'flex'; return false; }
+    }
+
+    document.querySelectorAll('#avatarList img').forEach(img => {
+      img.addEventListener('click', function() {
+        document.querySelectorAll('#avatarList img').forEach(i => i.classList.remove('selected'));
+        this.classList.add('selected'); selectedAvatar = this.dataset.value;
+      });
+    });
+
+    $('roleConfirm').addEventListener('click', () => {
+      const name = $('roleName').value.trim() || '匿名同学'; 
+      if (!selectedAvatar) { alert('选一个头像吧！'); return; }
+      currentUser = { name: name, avatar: selectedAvatar };
+      localStorage.setItem('gdmc_user', JSON.stringify(currentUser));
+      $('roleModal').style.display = 'none';
+    });
+
+    let isMusicPlaying = false;
+    const bgm = $('bgm');
+    $('musicToggle').addEventListener('click', () => {
+      if (isMusicPlaying) { bgm.pause(); $('musicToggle').textContent = '🔇'; }
+      else { bgm.play().catch(e => {}); $('musicToggle').textContent = '🔊'; }
+      isMusicPlaying = !isMusicPlaying;
+    });
+
+    // 陀螺仪 3D 视差
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', (e) => {
+        let rawX = e.gamma ? e.gamma : 0; 
+        let rawY = e.beta ? (e.beta - 45) : 0; 
+        let tiltX = Math.max(-60, Math.min(60, rawX * 1.5));
+        let tiltY = Math.max(-60, Math.min(60, rawY * 1.5));
+        $('bgLayer').style.transform = `translate3d(${tiltX * 1.5}px, ${tiltY * 1.5}px, 0)`;
+        const rotateY = tiltX * 0.4;
+        const rotateX = -tiltY * 0.3;
+        $('coverLeft').style.transform = `perspective(800px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) translate3d(${tiltX * 3}px, ${tiltY * 3}px, 0) scale(1.05)`;
+        $('coverRight').style.transform = `perspective(800px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) translate3d(${tiltX * 3}px, ${tiltY * 3}px, 0) scale(1.05)`;
+      });
+    }
+
+    $('startBtn').addEventListener('click', async () => {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try { await DeviceOrientationEvent.requestPermission(); } catch(e) {}
+      }
+      if (!initUser()) return;
+
+      bgm.volume = 0.5; bgm.play().catch(e => {}); isMusicPlaying = true; $('musicToggle').textContent = '🔊';
+      $('cover-page').classList.add('fly-away');
+      setTimeout(() => {
+        $('cover-page').style.display = 'none'; $('main-content').style.display = 'block';
+        loadStats(); loadMessages(); loadLocations();
+      }, 1500);
+    });
+
+    if (!currentUser) $('roleModal').style.display = 'flex';
+
+    function compressImage(file, callback) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800; const scale = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH; canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => { callback(new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })); }, 'image/jpeg', 0.7);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    let msgCompressedFile = null;
+    $('msgPhoto').addEventListener('change', function(e) {
+      const file = e.target.files[0]; if (!file) return;
+      compressImage(file, (compressed) => { msgCompressedFile = compressed; $('msgPhotoPreview').src = URL.createObjectURL(compressed); $('msgPhotoPreview').style.display = 'block'; });
+    });
+
+    let locCompressedFile = null;
+    $('locPhoto').addEventListener('change', function(e) {
+      const file = e.target.files[0]; if (!file) return;
+      compressImage(file, (compressed) => { locCompressedFile = compressed; $('locPhotoPreview').src = URL.createObjectURL(compressed); $('locPhotoPreview').style.display = 'block'; });
+    });
+
+    $('toggleTrajectory').addEventListener('click', () => {
+      const panel = $('trajectoryPanel');
+      if (panel.style.display === 'none') {
+        panel.style.display = 'block'; $('toggleTrajectory').textContent = '📜 收起旅行轨迹';
+      } else {
+        panel.style.display = 'none'; $('toggleTrajectory').textContent = '📜 奶娃的旅行轨迹';
+      }
+    });
+
+    async function loadStats() {
+      const { count, error } = await db.from('checkins').select('*', { count: 'exact', head: true });
+      if (!error) $('checkinCount').textContent = count ?? 0;
+    }
+
+    async function loadMessages() {
+      const { data, error } = await db.from('messages').select('*').order('created_at', { ascending: false }).limit(30);
+      if (error) { console.error(error); return; }
+      const box = $('messageList');
+      if (!data || data.length === 0) { box.innerHTML = `<img src="images/4.jpg" class="empty-img"><p style="text-align:center;color:#999;font-size:13px;">还没有留言，快来抢沙发～</p>`; return; }
+      box.innerHTML = data.map(item => `
+        <div class="message-item">
+          <img class="message-avatar" src="${item.avatar || 'images/t1.JPG'}" onerror="this.src='images/t1.JPG'">
+          <div class="message-body">
+            <div class="message-head"><strong>${escapeHtml(item.nickname || '匿名同学')}</strong><time>${formatTime(item.created_at)}</time></div>
+            <p class="message-content">${escapeHtml(item.content)}</p>
+            ${item.photo_url ? `<img class="message-img" src="${item.photo_url}" onerror="this.style.display='none'">` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadLocations() {
+      const { data, error } = await db.from('locations').select('*').order('created_at', { ascending: false }).limit(30);
+      if (error) return;
+      const cur = $('currentLocation'); const photoDiv = $('currentPhoto'); const box = $('locationList');
+      if (!data || data.length === 0) { cur.textContent = '当前位置：图书馆前'; photoDiv.innerHTML = ''; box.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">还没有旅行记录～</p>'; return; }
+      const latest = data[0];
+      cur.innerHTML = `当前位置：${escapeHtml(latest.location)} <span style="font-size:12px;color:#999;font-weight:normal;">(更新: ${formatTime(latest.created_at)})</span>`;
+      photoDiv.innerHTML = latest.photo_url ? `<img src="${latest.photo_url}" style="width:100%; border-radius:12px;" onerror="this.style.display='none'">` : '';
+      box.innerHTML = data.map(item => `
+        <div class="message-item">
+          <img class="message-avatar" src="images/t1.JPG">
+          <div class="message-body">
+            <div class="message-head"><strong>${escapeHtml(item.nickname || '匿名同学')}</strong><time>${formatTime(item.created_at)}</time></div>
+            <p class="message-content">📍 ${escapeHtml(item.location)}</p>
+            ${item.photo_url ? `<img class="message-img" src="${item.photo_url}" onerror="this.style.display='none'">` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function doCheckin() {
+      playCustomSound('2.MP3'); // 打卡音效
+      const btn = $('checkinBtn'); 
+      const nickname = currentUser?.name || '匿名同学';
+      const today = new Date().toISOString().slice(0, 10); const key = 'gdmc_checkin_' + today;
+      if (localStorage.getItem(key)) { showToast('你今天已经打过卡啦～'); return; }
+      
+      btn.disabled = true; btn.textContent = '打卡中...';
+      const { count } = await db.from('checkins').select('*', { count: 'exact', head: true });
+      const nextCount = (count || 0) + 1;
+      
+      const { error } = await db.from('checkins').insert({ nickname });
+      btn.disabled = false; btn.textContent = '拔剑！我要打卡！';
+      if (error) { showToast('打卡失败：' + error.message); return; }
+      localStorage.setItem(key, '1'); 
+      showToast(`今天你成为了第 ${nextCount} 个奶家人！`);
+      await loadStats();
+    }
+
+    async function submitMessage(e) {
+      e.preventDefault();
+      playCustomSound('3.MP3'); // 留言音效
+      const btn = e.target.querySelector('button[type="submit"]');
+      const nickname = currentUser?.name || '匿名同学';
+      const content = $('messageContent').value.trim();
+      
+      if (!content) { showToast('先写点留言吧～'); return; }
+      btn.disabled = true; btn.textContent = '发布中...';
+
+      let photoUrl = null;
+      if (msgCompressedFile) {
+        const fileName = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+        const { error: uploadError } = await db.storage.from('photos').upload(fileName, msgCompressedFile, { contentType: 'image/jpeg' });
+        if (!uploadError) { 
+          const { data: urlData } = db.storage.from('photos').getPublicUrl(fileName); 
+          photoUrl = urlData.publicUrl; 
+        } else {
+          console.error('留言图片上传失败:', uploadError);
+          showToast('图片上传失败，但不影响文字留言');
+        }
+      }
+
+      const { error } = await db.from('messages').insert({ nickname, content, avatar: currentUser?.avatar || null, photo_url: photoUrl });
+      btn.disabled = false; btn.textContent = '发布留言';
+      if (error) { showToast('留言失败：' + error.message); return; }
+      
+      $('messageContent').value = ''; $('msgPhoto').value = ''; $('msgPhotoPreview').style.display = 'none'; msgCompressedFile = null;
+      showToast('感谢奶家人！');
+      await loadMessages();
+    }
+
+    async function submitLocation() {
+      const btn = $('locBtn'); 
+      const nickname = currentUser?.name || '匿名同学';
+      const location = $('locPlace').value.trim();
+      
+      if (!location) { showToast('先填写当前位置～'); return; }
+      if (!locCompressedFile) { showToast('请务必上传一张立牌当前位置的照片！'); return; }
+
+      const isConfirmed = confirm(`确认将立牌移动到【${location}】吗？\n\n乱填位置会误导其他同学，请务必确认信息真实！`);
+      if (!isConfirmed) return;
+
+      btn.disabled = true; btn.textContent = '正在上传照片...';
+      const fileName = `loc_${Date.now()}.jpg`;
+      const { error: uploadError } = await db.storage.from('photos').upload(fileName, locCompressedFile, { contentType: 'image/jpeg' });
+      
+      if (uploadError) { 
+        console.error('位置照片上传失败:', uploadError);
+        showToast('照片上传失败：' + uploadError.message); 
+        btn.disabled = false; btn.textContent = '我把它带到了新地方'; 
+        return; 
+      }
+      
+      const { data: urlData } = db.storage.from('photos').getPublicUrl(fileName);
+      const photoUrl = urlData.publicUrl;
+
+      btn.textContent = '正在保存位置...';
+      const { error: insertError } = await db.from('locations').insert({ nickname, location, photo_url: photoUrl });
+      btn.disabled = false; btn.textContent = '我把它带到了新地方';
+      if (insertError) { showToast('位置保存失败：' + insertError.message); return; }
+      
+      $('locPlace').value = ''; $('locPhoto').value = ''; $('locPhotoPreview').style.display = 'none'; locCompressedFile = null;
+      showToast('更新成功！感谢你带它旅行～');
+      await loadLocations();
+    }
+
+    function escapeHtml(str = '') { return String(str).replace(/[&<>"']/g, s => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[s])); }
+    function formatTime(iso) { const d = new Date(iso); const pad = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+
+    $('checkinBtn').addEventListener('click', doCheckin);
+    $('messageForm').addEventListener('submit', submitMessage);
+    $('locBtn').addEventListener('click', submitLocation);
+  </script>
+</body>
+</html>
