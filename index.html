@@ -84,7 +84,6 @@
     <div class="role-box">
       <h2>👋 选一个你的角色吧</h2>
       <div class="role-avatars" id="avatarList">
-        <!-- 这里的路径改为了小写 .jpg，与你真实文件匹配 -->
         <img src="images/t1.jpg" data-value="images/t1.jpg" alt="奶娃1">
         <img src="images/t2.jpg" data-value="images/t2.jpg" alt="奶娃2">
         <img src="images/t3.jpg" data-value="images/t3.jpg" alt="奶娃3">
@@ -119,7 +118,7 @@
       <p style="font-size:14px;">本二维码为学生临时漂流打卡活动，仅用于校园打卡留言。</p>
       <p style="font-size:13px; color:#E65100;">✅ 不收费 ✅ 不索要验证码 ✅ 不收集隐私</p>
       <img src="images/3.jpg" class="empty-img" alt="生无可恋">
-      <p style="font-size:12px; text-align:center; color:#666;">如遇付费或索要验证码，请立即退出并联系：周奶娃（电话见立牌）</p>
+      <p style="font-size:12px; text-align:center; color:#666;">如遇付费或索要验证码，请立即退出并联系：周奶娃（电话见立牌）<br>微信号：fg_8900</p>
     </div>
 
     <!-- 位置区 -->
@@ -134,7 +133,7 @@
       </div>
 
       <hr style="margin: 15px 0; border: none; border-top: 1px dashed #FFE082;">
-      <div class="warning-text">⚠️ 提示：请务必填写真实准确的位置，并且上传一张当前位置的照片！</div>
+      <div class="warning-text">⚠️ 提示：请务必填写真实准确的位置，并上传照片！请勿破坏立牌，用完请将它移动到显眼且不挡路的地方，方便下一位同学寻找！</div>
       <input id="locPlace" type="text" maxlength="50" placeholder="当前位置，例如：图书馆前">
       <label for="locPhoto" class="photo-upload-label">📷 点击拍照/上传立牌现在的位置照片</label>
       <input type="file" id="locPhoto" accept="image/*" capture="environment">
@@ -181,14 +180,12 @@
       clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.style.display = 'none'; }, duration);
     }
 
-    // 播放自定义音效（加长版，针对微信/移动端优化，带提示）
+    // 播放自定义音效
     function playCustomSound(fileName) {
       const audio = new Audio(fileName);
       audio.volume = 0.6;
-      // 移动端必须用 touch 或者异步加载，这里直接尝试
       audio.play().catch(e => {
         console.log('音效播放被拦截:', e);
-        // 微信内置浏览器基本禁止音频，提示用户去浏览器打开
         if (navigator.userAgent.toLowerCase().indexOf('micromessenger') !== -1) {
           showToast('微信可能禁止播放声音，请点击右上角在浏览器打开体验');
         }
@@ -227,7 +224,7 @@
     });
 
     // 陀螺仪 3D 视差
-    let gyroEnabled = true; // 动画和陀螺仪打架的开关
+    let gyroEnabled = true;
     let tiltX = 0, tiltY = 0;
     if (window.DeviceOrientationEvent) {
       window.addEventListener('deviceorientation', (e) => {
@@ -250,7 +247,7 @@
       }
       if (!initUser()) return;
 
-      gyroEnabled = false; // 【解决动画冲突】点击后关闭陀螺仪，让飞开动画顺畅执行
+      gyroEnabled = false; 
       bgm.volume = 0.5; bgm.play().catch(e => {}); isMusicPlaying = true; $('musicToggle').textContent = '🔊';
       
       $('cover-page').classList.add('fly-away');
